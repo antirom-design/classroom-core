@@ -431,6 +431,8 @@
     // Draw Spaceship
     ctx.save();
     ctx.translate(spaceship.x, spaceship.y);
+    ctx.rotate(spaceship.angle); // Apply rotation
+
     // Draw Triangle Ship
     ctx.fillStyle = COLORS.ship;
     ctx.shadowBlur = 15;
