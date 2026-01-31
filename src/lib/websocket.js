@@ -34,7 +34,7 @@ export function createWebSocket() {
 
   function handleMessage(message) {
     const { type, data } = message;
-    console.log('📩 Received:', type, data);
+    console.log('[WS DEBUG] 📩 Received:', type, data);
 
     // Pass everything to subscribers
     notify({ type, data });
@@ -42,6 +42,7 @@ export function createWebSocket() {
 
   function send(type, data) {
     if (ws && ws.readyState === WebSocket.OPEN) {
+      console.log('[WS DEBUG] 📤 Sending:', type, data);
       ws.send(JSON.stringify({ type, data }));
     } else {
       console.warn('⚠️ WebSocket not ready. Cannot send:', type);

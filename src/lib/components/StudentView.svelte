@@ -21,11 +21,13 @@
 
     websocket.subscribe((msg) => {
         if (msg.type === "quizMissionStarted") {
+            console.log("[StudentView] 🚀 Mission Started!", msg.data);
             questions = msg.data.questions;
             gameState = "QUIZ";
             currentQuestionIndex = 0;
         }
         if (msg.type === "quizResult") {
+            console.log("[StudentView] 📊 Result received", msg.data);
             const {
                 correct,
                 streak: newStreak,

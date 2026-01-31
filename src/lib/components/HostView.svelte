@@ -38,6 +38,9 @@
   };
 
   onMount(() => {
+    if (canvas) {
+      ctx = canvas.getContext("2d");
+    }
     resize();
     window.addEventListener("resize", resize);
 
@@ -45,6 +48,9 @@
     const unsubscribe = websocket.subscribe((msg) => {
       handleMessage(msg);
     });
+
+    // Start Loop immediately
+    loop();
 
     return () => {
       window.removeEventListener("resize", resize);
@@ -73,6 +79,7 @@
       fireTower(msg.data);
     }
     if (msg.type === "pulse") {
+      console.log("[HostView] 📡 Pulse received", msg.data);
       handlePulse(msg.data);
     }
   }
