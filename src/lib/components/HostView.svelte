@@ -1,6 +1,6 @@
 <script>
   import { onMount, onDestroy } from "svelte";
-  import { fade, scale } from "svelte/transition";
+  import { fade, scale, fly } from "svelte/transition";
   import TopBar from "./TopBar.svelte";
 
   export let websocket;
@@ -14,27 +14,32 @@
   // Game State
   let gameState = "LOBBY"; // LOBBY, PLAYING, VICTORY
   let users = [];
-  let score = 0;
-  let wave = 1;
+  let strikes = 0;
+  let asteroidsDestroyed = 0;
+  let totalAsteroids = 0;
+
+  // Local Leaderboard (tracked from shots)
+  let leaderboard = new Map(); // sessionId -> { name, score, streaks }
 
   // Entities
-  let tower = { x: 0, y: 0, radius: 40, angle: 0, energy: 0 };
-  let enemies = [];
-  let projectiles = [];
+  let spaceship = { x: 0, y: 0, angle: -Math.PI / 2, radius: 30 };
+  let asteroids = [];
+  let lasers = [];
   let particles = [];
-  let pulses = []; // New pulses array
+  let pulses = [];
+  let spawnQueue = 0;
 
   // Configuration
-  const ENEMY_SPAWN_RATE = 2000; // ms
+  const SPAWN_RATE = 1500; // ms between spawns
   let lastSpawnTime = 0;
 
-  // Colors
   const COLORS = {
-    tower: "#4ECDC4",
-    enemy: "#FF6B6B",
-    projectile: "#FFE66D",
-    background: "#1a1a1a",
+    ship: "#4ECDC4",
+    asteroid: "#A0AEC0",
+    laser: "#FF6B6B",
+    background: "#0f172a", // Deep space
     text: "#ffffff",
+    accent: "#FBBF24", // Gold
   };
 
   onMount(() => {
@@ -44,12 +49,10 @@
     resize();
     window.addEventListener("resize", resize);
 
-    // Setup WS listeners
     const unsubscribe = websocket.subscribe((msg) => {
       handleMessage(msg);
     });
 
-    // Start Loop immediately
     loop();
 
     return () => {
@@ -65,27 +68,37 @@
       height = window.innerHeight;
       canvas.width = width;
       canvas.height = height;
-      tower.x = width / 2;
-      tower.y = height / 2;
+      spaceship.x = width / 2;
+      spaceship.y = height / 2;
     }
   }
 
   function handleMessage(msg) {
     if (msg.type === "rooms") {
-      // Update user list in lobby
       users = msg.data.filter((u) => !u.isHousemaster);
     }
     if (msg.type === "towerShot") {
-      fireTower(msg.data);
+      console.log("[HostView] 🔫 Laser Shot!", msg.data);
+      fireLaser(msg.data);
+      updateLeaderboard(msg.data);
     }
     if (msg.type === "pulse") {
-      console.log("[HostView] 📡 Pulse received", msg.data);
       handlePulse(msg.data);
     }
   }
 
+  function updateLeaderboard(data) {
+    const { from, fromName, damage } = data;
+    if (!leaderboard.has(from)) {
+      leaderboard.set(from, { name: fromName, score: 0, shots: 0 });
+    }
+    const entry = leaderboard.get(from);
+    entry.score += damage; // Use damage as score proxy
+    entry.shots += 1;
+    leaderboard = leaderboard; // Reactive update
+  }
+
   function handlePulse(data) {
-    // Create a pulse visual
     pulses.push({
       x: Math.random() * width,
       y: Math.random() * height,
@@ -95,21 +108,25 @@
       color: "#ffffff",
       label: data.fromName,
     });
-
-    // Also shake the tower a bit
-    tower.radius = 50;
   }
 
   function startGame() {
     gameState = "PLAYING";
-    score = 0;
-    wave = 1;
-    enemies = [];
-    projectiles = [];
-    lastSpawnTime = Date.now();
-    loop();
+    strikes = 0;
+    asteroidsDestroyed = 0;
+    leaderboard = new Map();
+    asteroids = [];
+    lasers = [];
 
-    // Start Quiz on clients
+    // Calculate Total Asteroids: Users * Questions
+    // Hardcoded question count for now (4 questions in startQuizMission)
+    const questionCount = 4;
+    totalAsteroids = users.length * questionCount;
+    spawnQueue = totalAsteroids;
+
+    lastSpawnTime = Date.now();
+
+    // Start Quiz
     websocket.startQuizMission(sessionStorage.getItem("quiz_session_id"), [
       {
         id: 1,
@@ -142,139 +159,161 @@
     window.location.reload();
   }
 
-  function fireTower(data) {
-    // Find nearest enemy
+  function fireLaser(data) {
+    // Find nearest asteroid
     let target = null;
     let minDist = Infinity;
 
-    for (const enemy of enemies) {
-      const dx = enemy.x - tower.x;
-      const dy = enemy.y - tower.y;
+    for (const asteroid of asteroids) {
+      if (asteroid.destroyed) continue;
+      const dx = asteroid.x - spaceship.x;
+      const dy = asteroid.y - spaceship.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
       if (dist < minDist) {
         minDist = dist;
-        target = enemy;
+        target = asteroid;
       }
     }
 
-    let angle = 0;
+    let angle = -Math.PI / 2;
+    let tx = spaceship.x;
+    let ty = -100; // Default aim up
+
     if (target) {
-      angle = Math.atan2(target.y - tower.y, target.x - tower.x);
+      angle = Math.atan2(target.y - spaceship.y, target.x - spaceship.x);
+      tx = target.x;
+      ty = target.y;
+
+      // Instant Hit Visual
+      lasers.push({
+        x1: spaceship.x,
+        y1: spaceship.y,
+        x2: target.x,
+        y2: target.y,
+        life: 1.0,
+        color: data.level > 2 ? "#d946ef" : COLORS.laser, // Purple for super
+        width: data.level * 2,
+      });
+
+      // Destroy logic
+      target.hp -= data.damage;
+      if (target.hp <= 0 && !target.destroyed) {
+        target.destroyed = true;
+        asteroidsDestroyed++;
+        createParticles(target.x, target.y, COLORS.asteroid, 10);
+        createParticles(target.x, target.y, COLORS.accent, 5); // Gold sparks context
+      }
     } else {
-      angle = Math.random() * Math.PI * 2;
+      // Warning shot / Miss
+      lasers.push({
+        x1: spaceship.x,
+        y1: spaceship.y,
+        x2: spaceship.x + Math.cos(angle) * 1000,
+        y2: spaceship.y + Math.sin(angle) * 1000,
+        life: 1.0,
+        color: COLORS.laser,
+        width: 2,
+      });
     }
 
-    // Spawn Projectile
-    projectiles.push({
-      x: tower.x,
-      y: tower.y,
-      vx: Math.cos(angle) * 10,
-      vy: Math.sin(angle) * 10,
-      damage: data.damage,
-      level: data.level,
-      color: data.level > 2 ? "#FF00FF" : COLORS.projectile,
-      size: data.level * 4 + 4,
-      from: data.fromName,
-    });
-
-    // Pulse Tower
-    tower.radius = 45;
+    // Recoil
+    spaceship.x -= Math.cos(angle) * 5;
+    spaceship.y -= Math.sin(angle) * 5;
   }
 
-  function spawnEnemy() {
-    // Spawn at edge
+  function spawnAsteroid() {
+    if (spawnQueue <= 0) return;
+    spawnQueue--;
+
     const angle = Math.random() * Math.PI * 2;
-    const r = Math.max(width, height) / 2 + 50;
+    const r = Math.max(width, height) / 2 + 100; // Spawn offscreen
     const x = width / 2 + Math.cos(angle) * r;
     const y = height / 2 + Math.sin(angle) * r;
 
-    enemies.push({
+    // Random Polygon Shape
+    const vertices = [];
+    const points = 5 + Math.floor(Math.random() * 4);
+    for (let i = 0; i < points; i++) {
+      const a = (Math.PI * 2 * i) / points;
+      const radiusVar = 20 + Math.random() * 15;
+      vertices.push({
+        x: Math.cos(a) * radiusVar,
+        y: Math.sin(a) * radiusVar,
+      });
+    }
+
+    asteroids.push({
       x,
       y,
-      speed: 1 + wave * 0.1,
-      hp: 10 + wave * 2,
-      maxHp: 10 + wave * 2,
-      size: 20,
-      color: COLORS.enemy,
+      vx: (spaceship.x - x) * 0.002, // Move towards center
+      vy: (spaceship.y - y) * 0.002,
+      hp: 10,
+      vertices,
+      rotation: Math.random() * Math.PI * 2,
+      rotSpeed: (Math.random() - 0.5) * 0.05,
+      destroyed: false,
     });
   }
 
   function update() {
     const now = Date.now();
 
-    if (now - lastSpawnTime > ENEMY_SPAWN_RATE / Math.sqrt(wave)) {
-      // Only spawn if playing
-      if (gameState === "PLAYING") {
-        spawnEnemy();
+    // Spawning logic
+    if (gameState === "PLAYING" && now - lastSpawnTime > SPAWN_RATE) {
+      if (spawnQueue > 0) {
+        spawnAsteroid();
+        lastSpawnTime = now;
+      } else if (asteroids.length === 0) {
+        // All spawned and all destroyed/hit
+        gameState = "VICTORY";
       }
-      lastSpawnTime = now;
     }
 
-    // Update Tower
-    if (tower.radius > 40) tower.radius -= 0.5;
+    // Ship Drift (return to center)
+    spaceship.x += (width / 2 - spaceship.x) * 0.05;
+    spaceship.y += (height / 2 - spaceship.y) * 0.05;
 
-    // Move Projectiles
-    for (let i = projectiles.length - 1; i >= 0; i--) {
-      const p = projectiles[i];
-      p.x += p.vx;
-      p.y += p.vy;
-
-      // Bounds check
-      if (p.x < -100 || p.x > width + 100 || p.y < -100 || p.y > height + 100) {
-        projectiles.splice(i, 1);
+    // Movement & Collision
+    for (let i = asteroids.length - 1; i >= 0; i--) {
+      const a = asteroids[i];
+      if (a.destroyed) {
+        asteroids.splice(i, 1);
         continue;
       }
 
-      // Collision Check
-      for (let j = enemies.length - 1; j >= 0; j--) {
-        const e = enemies[j];
-        const dx = p.x - e.x;
-        const dy = p.y - e.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
+      a.x += a.vx;
+      a.y += a.vy;
+      a.rotation += a.rotSpeed;
 
-        if (dist < e.size + p.size) {
-          // Hit
-          e.hp -= p.damage;
-          createParticles(e.x, e.y, p.color, 5);
-
-          if (e.hp <= 0) {
-            enemies.splice(j, 1);
-            score += 10;
-            createParticles(e.x, e.y, COLORS.enemy, 15);
-          }
-
-          projectiles.splice(i, 1);
-          break;
-        }
+      // Hit Ship?
+      const dist = Math.sqrt(
+        (a.x - spaceship.x) ** 2 + (a.y - spaceship.y) ** 2,
+      );
+      if (dist < spaceship.radius + 30) {
+        // STRIKE!
+        strikes++;
+        asteroids.splice(i, 1);
+        createParticles(spaceship.x, spaceship.y, "#ef4444", 20); // Red explosion
+        // Shake effect could go here
       }
     }
 
-    // Move Enemies
-    for (const e of enemies) {
-      const dx = tower.x - e.x;
-      const dy = tower.y - e.y;
-      const angle = Math.atan2(dy, dx);
-
-      e.x += Math.cos(angle) * e.speed;
-      e.y += Math.sin(angle) * e.speed;
-
-      // Damage Tower?
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist < tower.radius + e.size) {
-        // Game Over logic here (not implemented for MVP)
-      }
+    // Lasers
+    for (const l of lasers) {
+      l.life -= 0.1;
     }
+    lasers = lasers.filter((l) => l.life > 0);
 
-    // Update Particles
+    // Particles
     for (let i = particles.length - 1; i >= 0; i--) {
       const p = particles[i];
       p.x += p.vx;
       p.y += p.vy;
-      p.life -= 0.05;
+      p.life -= 0.02;
       if (p.life <= 0) particles.splice(i, 1);
     }
 
-    // Update Pulses
+    // Pulses
     for (let i = pulses.length - 1; i >= 0; i--) {
       const p = pulses[i];
       p.radius += 5;
@@ -286,7 +325,7 @@
   function createParticles(x, y, color, count) {
     for (let i = 0; i < count; i++) {
       const angle = Math.random() * Math.PI * 2;
-      const speed = Math.random() * 5;
+      const speed = Math.random() * 4;
       particles.push({
         x,
         y,
@@ -294,26 +333,23 @@
         vy: Math.sin(angle) * speed,
         color,
         life: 1.0,
-        size: Math.random() * 5 + 2,
+        size: Math.random() * 4 + 2,
       });
     }
   }
 
   function draw() {
-    // Clear
     ctx.fillStyle = COLORS.background;
     ctx.fillRect(0, 0, width, height);
 
-    // Draw Pulses
+    // Draw Pulses (Signals)
+    ctx.lineWidth = 2;
     for (const p of pulses) {
       ctx.globalAlpha = p.opacity;
       ctx.strokeStyle = p.color;
-      ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
       ctx.stroke();
-
-      // Draw Text
       ctx.fillStyle = p.color;
       ctx.font = "14px Inter";
       ctx.textAlign = "center";
@@ -331,51 +367,69 @@
     }
     ctx.globalAlpha = 1.0;
 
-    // Draw Tower
-    ctx.fillStyle = COLORS.tower;
-    ctx.beginPath();
-    ctx.arc(tower.x, tower.y, tower.radius, 0, Math.PI * 2);
-    ctx.fill();
-    // Tower glow
-    ctx.shadowBlur = 20;
-    ctx.shadowColor = COLORS.tower;
-    ctx.stroke();
-    ctx.shadowBlur = 0;
-
-    // Draw Enemies
-    for (const e of enemies) {
-      ctx.fillStyle = e.color;
+    // Draw Lasers
+    for (const l of lasers) {
+      ctx.globalAlpha = l.life;
+      ctx.strokeStyle = l.color;
+      ctx.lineWidth = l.width;
+      ctx.lineCap = "round";
       ctx.beginPath();
-      // Draw Hexagon for enemies
-      for (let i = 0; i < 6; i++) {
-        const angle = (Math.PI / 3) * i;
-        const x = e.x + Math.cos(angle) * e.size;
-        const y = e.y + Math.sin(angle) * e.size;
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
+      ctx.moveTo(l.x1, l.y1);
+      ctx.lineTo(l.x2, l.y2);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1.0;
+
+    // Draw Asteroids
+    ctx.fillStyle = COLORS.asteroid;
+    ctx.strokeStyle = "#cbd5e1";
+    ctx.lineWidth = 2;
+    for (const a of asteroids) {
+      ctx.save();
+      ctx.translate(a.x, a.y);
+      ctx.rotate(a.rotation);
+
+      ctx.beginPath();
+      const v = a.vertices;
+      ctx.moveTo(v[0].x, v[0].y);
+      for (let i = 1; i < v.length; i++) {
+        ctx.lineTo(v[i].x, v[i].y);
       }
       ctx.closePath();
       ctx.fill();
+      ctx.stroke();
+      ctx.restore();
     }
 
-    // Draw Projectiles
-    for (const p of projectiles) {
-      ctx.fillStyle = p.color;
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-      ctx.fill();
+    // Draw Spaceship
+    ctx.save();
+    ctx.translate(spaceship.x, spaceship.y);
+    // Draw Triangle Ship
+    ctx.fillStyle = COLORS.ship;
+    ctx.shadowBlur = 15;
+    ctx.shadowColor = COLORS.ship;
 
-      // Trail
+    ctx.beginPath();
+    ctx.moveTo(20, 0); // Tip
+    ctx.lineTo(-15, 15); // Bottom Right
+    ctx.lineTo(-5, 0); // Engine notch
+    ctx.lineTo(-15, -15); // Bottom Left
+    ctx.closePath();
+    ctx.fill();
+
+    // Shield / Strike Indicator
+    if (strikes > 0) {
+      ctx.strokeStyle = "#ef4444"; // Red for danger
       ctx.beginPath();
-      ctx.moveTo(p.x, p.y);
-      ctx.lineTo(p.x - p.vx * 2, p.y - p.vy * 2);
-      ctx.strokeStyle = p.color;
+      ctx.arc(0, 0, 35, 0, Math.PI * 2);
       ctx.stroke();
     }
+
+    ctx.restore();
+    ctx.shadowBlur = 0;
   }
 
   function loop() {
-    // Loop always needs to run for pulses even in Lobby
     update();
     draw();
     animationFrame = requestAnimationFrame(loop);
@@ -386,8 +440,8 @@
   <TopBar {roomCode} isHousemaster={true} on:leave={handleLeave} />
 
   {#if gameState === "LOBBY"}
-    <div class="lobby" in:fade>
-      <h1>Classroom Core: Defense Lobby</h1>
+    <div class="overlay" in:fade>
+      <h1>MISSION: ASTEROID DEFENSE</h1>
       <div class="info">
         <p>Waiting for Operators...</p>
         <div class="player-count">{users.length} connected</div>
@@ -415,8 +469,35 @@
 
   {#if gameState === "PLAYING"}
     <div class="hud">
-      <div class="score">SCORE: {score}</div>
-      <div class="wave">WAVE: {wave}</div>
+      <div class="panel left">
+        <div class="label">STRIKES</div>
+        <div class="value danger">{strikes}</div>
+      </div>
+      <div class="panel right">
+        <div class="label">DESTROYED</div>
+        <div class="value success">{asteroidsDestroyed} / {totalAsteroids}</div>
+      </div>
+    </div>
+  {/if}
+
+  {#if gameState === "VICTORY"}
+    <div class="overlay" in:scale>
+      <h1>MISSION DEBRIEF</h1>
+      <h2>{strikes === 0 ? "PERFECT DEFENSE!" : `${strikes} HULL BREACHES`}</h2>
+
+      <div class="leaderboard">
+        {#each Array.from(leaderboard.values())
+          .sort((a, b) => b.score - a.score)
+          .slice(0, 5) as player, i}
+          <div class="rank-row">
+            <span class="rank">#{i + 1}</span>
+            <span class="name">{player.name}</span>
+            <span class="score">{player.score} pts</span>
+          </div>
+        {/each}
+      </div>
+
+      <button class="start-btn" on:click={startGame}> RE-ENGAGE </button>
     </div>
   {/if}
 </div>
@@ -426,9 +507,10 @@
     width: 100%;
     height: 100%;
     position: relative;
-    background: #1a1a1a;
+    background: #0f172a;
     color: white;
     font-family: "Inter", sans-serif;
+    overflow: hidden;
   }
 
   canvas {
@@ -437,14 +519,28 @@
     height: 100%;
   }
 
-  .lobby {
+  .overlay {
     position: absolute;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
     text-align: center;
-    width: 80%;
+    width: 90%;
+    max-width: 800px;
     z-index: 10;
+    background: rgba(15, 23, 42, 0.9);
+    padding: 2rem;
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+  }
+
+  h1 {
+    font-size: 3rem;
+    margin-bottom: 0.5rem;
+    background: linear-gradient(to right, #4ecdc4, #556270);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
   }
 
   .player-grid {
@@ -456,37 +552,98 @@
   }
 
   .player-bubble {
-    background: #4ecdc4;
-    color: #1a1a1a;
+    background: rgba(78, 205, 196, 0.2);
+    border: 1px solid #4ecdc4;
+    color: #4ecdc4;
     padding: 0.5rem 1rem;
     border-radius: 20px;
     font-weight: bold;
+    font-size: 1.2rem;
   }
 
   .start-btn {
-    background: #ff6b6b;
-    color: white;
+    background: #4ecdc4;
+    color: #0f172a;
     border: none;
     padding: 1rem 3rem;
     font-size: 1.5rem;
-    font-weight: bold;
-    border-radius: 4px;
+    font-weight: 800;
+    border-radius: 50px;
     cursor: pointer;
     text-transform: uppercase;
     letter-spacing: 2px;
+    transition: all 0.2s;
+    box-shadow: 0 0 20px rgba(78, 205, 196, 0.4);
+  }
+
+  .start-btn:hover {
+    transform: scale(1.05);
+    box-shadow: 0 0 30px rgba(78, 205, 196, 0.6);
   }
 
   .start-btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+    transform: none;
   }
 
   .hud {
     position: absolute;
-    top: 2rem;
-    left: 2rem;
-    font-size: 2rem;
-    font-weight: bold;
+    top: 80px;
+    left: 0;
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    padding: 0 40px;
     pointer-events: none;
+  }
+
+  .panel {
+    text-align: center;
+  }
+
+  .label {
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.6);
+    letter-spacing: 1px;
+  }
+
+  .value {
+    font-size: 2.5rem;
+    font-weight: 800;
+  }
+
+  .value.danger {
+    color: #ef4444;
+    text-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
+  }
+  .value.success {
+    color: #4ecdc4;
+    text-shadow: 0 0 10px rgba(78, 205, 196, 0.5);
+  }
+
+  .leaderboard {
+    margin: 2rem 0;
+    text-align: left;
+  }
+
+  .rank-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 1rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    font-size: 1.2rem;
+  }
+
+  .rank {
+    font-weight: bold;
+    color: #fbbf24;
+    width: 40px;
+  }
+  .name {
+    flex-grow: 1;
+  }
+  .score {
+    font-weight: bold;
   }
 </style>
