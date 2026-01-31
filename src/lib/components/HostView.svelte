@@ -368,18 +368,8 @@
   }
 
   function draw() {
-    ctx.fillStyle = "#1e293b"; // Lighter slate for debug visibility
+    ctx.fillStyle = COLORS.background;
     ctx.fillRect(0, 0, width, height);
-
-    if (Math.random() < 0.01) {
-      console.log("DEBUG SHIP:", {
-        x: spaceship.x,
-        y: spaceship.y,
-        angle: spaceship.angle,
-        w: width,
-        h: height,
-      });
-    }
 
     // Draw Pulses (Signals)
     ctx.lineWidth = 2;
@@ -581,6 +571,7 @@
     margin-bottom: 0.5rem;
     background: linear-gradient(to right, #4ecdc4, #556270);
     -webkit-background-clip: text;
+    background-clip: text;
     -webkit-text-fill-color: transparent;
   }
 
