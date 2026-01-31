@@ -1,0 +1,418 @@
+<script>
+    import { createEventDispatcher } from "svelte";
+
+    export let roomCode = "";
+    export let isHousemaster = false;
+    export let showQRCode = false;
+    // Removed trail-specific props like settings, roomMode
+
+    const dispatch = createEventDispatcher();
+
+    let copied = false;
+    let urlCopied = false;
+    let showLeaveConfirm = false;
+
+    function requestLeave() {
+        showLeaveConfirm = true;
+    }
+
+    function confirmLeave() {
+        showLeaveConfirm = false;
+        dispatch("leave");
+    }
+
+    function cancelLeave() {
+        showLeaveConfirm = false;
+    }
+
+    function copyCode(e) {
+        if (e) e.stopPropagation();
+        navigator.clipboard.writeText(shareUrl);
+        copied = true;
+        setTimeout(() => (copied = false), 2000);
+    }
+
+    function copyUrl(e) {
+        if (e) e.stopPropagation();
+        navigator.clipboard.writeText(shareUrl);
+        urlCopied = true;
+        setTimeout(() => (urlCopied = false), 2000);
+    }
+
+    function toggleQRCode(e) {
+        e.stopPropagation();
+        showQRCode = !showQRCode;
+    }
+
+    function closeQRCode() {
+        showQRCode = false;
+    }
+
+    $: shareUrl = `${window.location.origin}?join=${roomCode}`;
+    $: qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(shareUrl)}`;
+</script>
+
+<div class="top-bar">
+    <!-- Room code and share -->
+    <div class="room-section">
+        <span class="code" on:click={copyCode} role="button" tabindex="0"
+            >{roomCode}</span
+        >
+        <button
+            class="icon-btn"
+            class:active={copied}
+            on:click={copyCode}
+            title="Copy link"
+        >
+            {#if copied}
+                <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                >
+                    <polyline points="20 6 9 17 4 12" />
+                </svg>
+            {:else}
+                <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                >
+                    <rect x="9" y="9" width="13" height="13" rx="2" />
+                    <path
+                        d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"
+                    />
+                </svg>
+            {/if}
+        </button>
+        <button class="icon-btn" on:click={toggleQRCode} title="Share QR">
+            <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+            >
+                <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+                <polyline points="16 6 12 2 8 6" />
+                <line x1="12" y1="2" x2="12" y2="15" />
+            </svg>
+        </button>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- Leave button -->
+    <button
+        class="icon-btn leave-btn"
+        on:click={requestLeave}
+        title="Leave Room"
+    >
+        <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+        >
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+            <polyline points="16 17 21 12 16 7" />
+            <line x1="21" y1="12" x2="9" y2="12" />
+        </svg>
+    </button>
+</div>
+
+<!-- Leave confirmation modal -->
+{#if showLeaveConfirm}
+    <div class="confirm-modal" on:click={cancelLeave} role="dialog">
+        <div
+            class="confirm-content"
+            on:click|stopPropagation
+            role="alertdialog"
+        >
+            <h3>Leave Mission?</h3>
+            <p>Are you sure you want to abort the mission?</p>
+            <div class="confirm-buttons">
+                <button class="cancel-btn" on:click={cancelLeave}>Cancel</button
+                >
+                <button class="confirm-btn leave" on:click={confirmLeave}
+                    >Abort</button
+                >
+            </div>
+        </div>
+    </div>
+{/if}
+
+<!-- QR Code modal -->
+{#if showQRCode}
+    <div class="qr-modal" on:click={closeQRCode} role="dialog">
+        <div class="qr-content" on:click|stopPropagation>
+            <button class="modal-close" on:click={closeQRCode}>x</button>
+            <h3>Scan to Join Mission</h3>
+            <img src={qrCodeUrl} alt="QR Code" />
+            <p
+                class="share-url"
+                class:copied={urlCopied}
+                on:click={copyUrl}
+                role="button"
+                tabindex="0"
+                title="Click to copy"
+            >
+                {urlCopied ? "Copied!" : shareUrl}
+            </p>
+        </div>
+    </div>
+{/if}
+
+<style>
+    .top-bar {
+        position: fixed;
+        top: 12px;
+        right: 12px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 10px;
+        background: rgba(0, 0, 0, 0.6);
+        border-radius: 20px;
+        backdrop-filter: blur(10px);
+        z-index: 1000;
+    }
+
+    .room-section {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .code {
+        font-family: "Courier New", monospace;
+        font-weight: 600;
+        font-size: 0.85rem;
+        color: #4ecdc4; /* Updated to match theme */
+        cursor: pointer;
+        padding: 2px 6px;
+        border-radius: 4px;
+        transition: background 0.2s;
+    }
+
+    .code:hover {
+        background: rgba(78, 205, 196, 0.2);
+    }
+
+    .icon-btn {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        border: none;
+        background: transparent;
+        color: rgba(255, 255, 255, 0.7);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.15s;
+        padding: 5px;
+    }
+
+    .icon-btn:hover {
+        color: white;
+        background: rgba(255, 255, 255, 0.15);
+    }
+
+    .icon-btn.active {
+        color: #4ecdc4;
+    }
+
+    .icon-btn.leave-btn:hover {
+        color: #ff6b6b;
+        background: rgba(255, 107, 107, 0.15);
+    }
+
+    .icon-btn svg {
+        width: 16px;
+        height: 16px;
+    }
+
+    .divider {
+        width: 1px;
+        height: 18px;
+        background: rgba(255, 255, 255, 0.2);
+        margin: 0 2px;
+    }
+
+    /* QR Modal */
+    .qr-modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.8);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 2000;
+    }
+
+    .qr-content {
+        background: white;
+        border-radius: 16px;
+        padding: 24px;
+        text-align: center;
+        position: relative;
+        max-width: 340px;
+    }
+
+    .modal-close {
+        position: absolute;
+        top: 8px;
+        right: 12px;
+        background: none;
+        border: none;
+        font-size: 24px;
+        cursor: pointer;
+        color: #666;
+    }
+
+    .qr-content h3 {
+        margin: 0 0 16px 0;
+        color: #333;
+    }
+
+    .qr-content img {
+        width: 200px;
+        height: 200px;
+        display: block;
+        margin: 0 auto 12px;
+    }
+
+    .share-url {
+        font-size: 0.75rem;
+        color: #667eea;
+        word-break: break-all;
+        background: rgba(102, 126, 234, 0.1);
+        padding: 8px;
+        border-radius: 4px;
+        margin: 0;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .share-url:hover {
+        background: rgba(102, 126, 234, 0.2);
+    }
+
+    .share-url.copied {
+        background: rgba(78, 205, 196, 0.2);
+        color: #4ecdc4;
+    }
+
+    /* Confirmation modal */
+    .confirm-modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.7);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 2000;
+    }
+
+    .confirm-content {
+        background: rgba(30, 30, 30, 0.95);
+        border: 2px solid rgba(255, 255, 255, 0.2);
+        border-radius: 16px;
+        padding: 24px;
+        max-width: 300px;
+        text-align: center;
+        backdrop-filter: blur(20px);
+    }
+
+    .confirm-content h3 {
+        margin: 0 0 8px 0;
+        color: white;
+        font-size: 1.1rem;
+    }
+
+    .confirm-content p {
+        margin: 0 0 20px 0;
+        color: rgba(255, 255, 255, 0.7);
+        font-size: 0.9rem;
+    }
+
+    .confirm-buttons {
+        display: flex;
+        gap: 12px;
+        justify-content: center;
+    }
+
+    .cancel-btn,
+    .confirm-btn {
+        padding: 10px 20px;
+        border-radius: 20px;
+        border: none;
+        cursor: pointer;
+        font-size: 0.9rem;
+        font-weight: 500;
+        transition: all 0.15s;
+    }
+
+    .cancel-btn {
+        background: rgba(255, 255, 255, 0.2);
+        color: white;
+    }
+
+    .cancel-btn:hover {
+        background: rgba(255, 255, 255, 0.3);
+    }
+
+    .confirm-btn {
+        background: #667eea;
+        color: white;
+    }
+
+    .confirm-btn:hover {
+        background: #5a6fd6;
+    }
+
+    .confirm-btn.leave {
+        background: #ff6b6b;
+    }
+
+    .confirm-btn.leave:hover {
+        background: #e55555;
+    }
+
+    @media (max-width: 600px) {
+        .top-bar {
+            top: 8px;
+            right: 8px;
+            padding: 5px 8px;
+            gap: 4px;
+        }
+
+        .code {
+            font-size: 0.75rem;
+        }
+
+        .icon-btn {
+            width: 26px;
+            height: 26px;
+            padding: 4px;
+        }
+
+        .icon-btn svg {
+            width: 14px;
+            height: 14px;
+        }
+
+        .qr-content img {
+            width: 160px;
+            height: 160px;
+        }
+    }
+</style>
