@@ -1,35 +1,35 @@
 <script>
-  import { createEventDispatcher } from 'svelte';
+  import { createEventDispatcher } from "svelte";
 
   const dispatch = createEventDispatcher();
 
-  let displayName = '';
+  let displayName = "";
 
   function handleSubmit(e) {
     e.preventDefault();
     if (displayName.trim()) {
-      dispatch('submit', displayName.trim());
+      dispatch("submit", displayName.trim());
     }
   }
 </script>
 
 <div class="name-input-screen">
-  <div class="name-card">
-    <h1>Welcome to Multitrail</h1>
-    <p>Enter your name to start drawing</p>
+  <div class="glass-panel">
+    <h1>CLASSROOM CORE</h1>
+    <p>Prepare for the mission</p>
 
     <form on:submit={handleSubmit}>
       <input
         type="text"
         bind:value={displayName}
-        placeholder="Your name"
+        placeholder="ENTER OPERATOR ID"
         maxlength="20"
         autocomplete="off"
         autofocus
       />
 
       <button type="submit" disabled={!displayName.trim()}>
-        Continue
+        INITIALIZE MISSION
       </button>
     </form>
   </div>
@@ -37,108 +37,104 @@
 
 <style>
   .name-input-screen {
-    position: fixed;
-    top: 0;
-    left: 0;
     width: 100%;
     height: 100%;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 20px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: 24px;
   }
 
-  .name-card {
-    background: white;
-    border-radius: 16px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-    padding: 48px 40px;
-    max-width: 400px;
+  .glass-panel {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(20px);
+    border-radius: 24px;
+    padding: 3rem;
+    max-width: 480px;
     width: 100%;
     text-align: center;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
   }
 
   h1 {
-    font-size: 32px;
-    color: #333;
-    margin: 0 0 12px 0;
-    font-weight: 300;
+    font-size: 2.5rem;
+    font-weight: 800;
+    margin: 0 0 0.5rem 0;
+    letter-spacing: 4px;
+    background: linear-gradient(to right, #4ecdc4, #556270);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
   }
 
   p {
-    color: #666;
-    margin: 0 0 32px 0;
-    font-size: 16px;
+    color: rgba(255, 255, 255, 0.5);
+    margin: 0 0 2.5rem 0;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    font-size: 0.9rem;
   }
 
   form {
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 20px;
   }
 
   input {
     width: 100%;
-    padding: 16px;
-    border: 2px solid #e0e0e0;
-    border-radius: 8px;
-    font-size: 16px;
+    padding: 18px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    font-size: 1.1rem;
+    color: white;
+    text-align: center;
     transition: all 0.2s;
     box-sizing: border-box;
+    letter-spacing: 1px;
   }
 
   input:focus {
     outline: none;
-    border-color: #667eea;
-    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    background: rgba(255, 255, 255, 0.08);
+    border-color: #4ecdc4;
   }
 
   button {
     width: 100%;
-    padding: 16px;
-    background: #667eea;
-    color: white;
+    padding: 18px;
+    background: #4ecdc4;
+    color: #0f172a;
     border: none;
-    border-radius: 8px;
-    font-size: 16px;
-    font-weight: 600;
+    border-radius: 50px;
+    font-size: 1.1rem;
+    font-weight: 800;
     cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 2px;
     transition: all 0.2s;
+    box-shadow: 0 0 20px rgba(78, 205, 196, 0.3);
   }
 
   button:hover:not(:disabled) {
-    background: #5568d3;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
-  }
-
-  button:active:not(:disabled) {
-    transform: translateY(0);
+    transform: scale(1.02);
+    box-shadow: 0 0 30px rgba(78, 205, 196, 0.5);
   }
 
   button:disabled {
-    opacity: 0.5;
+    opacity: 0.3;
     cursor: not-allowed;
   }
 
-  @media (max-width: 768px) {
-    .name-input-screen {
-      padding: 0;
-    }
-
-    .name-card {
+  @media (max-width: 600px) {
+    .glass-panel {
+      padding: 2rem;
       border-radius: 0;
-      padding: 32px 24px;
-      max-width: 100%;
-    }
-
-    h1 {
-      font-size: 28px;
-    }
-
-    p {
-      font-size: 14px;
+      border: none;
+      background: transparent;
+      backdrop-filter: none;
     }
   }
 </style>

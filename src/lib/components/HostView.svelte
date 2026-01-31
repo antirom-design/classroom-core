@@ -500,16 +500,18 @@
   <TopBar {roomCode} isHousemaster={true} on:leave={handleLeave} />
 
   {#if gameState === "LOBBY"}
-    <div class="overlay" in:fade>
-      <h1>MISSION: ASTEROID DEFENSE</h1>
-      <div class="info">
-        <p>Waiting for Operators...</p>
-        <div class="player-count">{users.length} connected</div>
+    <div class="overlay lobby" in:fade>
+      <div class="hero">
+        <h1>ASTEROID DEFENSE</h1>
+        <p class="subtitle">
+          MISSION READINESS: {users.length} OPERATORS CONNECTED
+        </p>
       </div>
 
       <div class="player-grid">
         {#each users as user}
           <div class="player-bubble" transition:scale>
+            <span class="status-dot"></span>
             {user.name}
           </div>
         {/each}
@@ -529,11 +531,11 @@
 
   {#if gameState === "PLAYING"}
     <div class="hud">
-      <div class="panel left">
+      <div class="panel left glass">
         <div class="label">STRIKES</div>
         <div class="value danger">{strikes}</div>
       </div>
-      <div class="panel right">
+      <div class="panel right glass">
         <div class="label">DESTROYED</div>
         <div class="value success">{asteroidsDestroyed} / {totalAsteroids}</div>
       </div>
@@ -541,9 +543,11 @@
   {/if}
 
   {#if gameState === "VICTORY"}
-    <div class="overlay" in:scale>
+    <div class="overlay victory glass" in:scale>
       <h1>MISSION DEBRIEF</h1>
-      <h2>{strikes === 0 ? "PERFECT DEFENSE!" : `${strikes} HULL BREACHES`}</h2>
+      <h2 class="result-text">
+        {strikes === 0 ? "PERFECT DEFENSE!" : `${strikes} HULL BREACHES`}
+      </h2>
 
       <div class="leaderboard">
         {#each Array.from(leaderboard.values())
@@ -552,7 +556,7 @@
           <div class="rank-row">
             <span class="rank">#{i + 1}</span>
             <span class="name">{player.name}</span>
-            <span class="score">{player.score} pts</span>
+            <span class="score">{player.score} PTS</span>
           </div>
         {/each}
       </div>
@@ -567,7 +571,6 @@
     width: 100%;
     height: 100%;
     position: relative;
-    background: #0f172a;
     color: white;
     font-family: "Inter", sans-serif;
     overflow: hidden;
@@ -588,20 +591,41 @@
     width: 90%;
     max-width: 800px;
     z-index: 10;
-    background: rgba(15, 23, 42, 0.9);
-    padding: 2rem;
-    border-radius: 20px;
+    padding: 3rem;
+    border-radius: 32px;
+  }
+
+  .overlay.glass {
+    background: rgba(15, 23, 42, 0.6);
     border: 1px solid rgba(255, 255, 255, 0.1);
-    backdrop-filter: blur(10px);
+    backdrop-filter: blur(20px);
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+  }
+
+  .subtitle {
+    color: rgba(255, 255, 255, 0.5);
+    letter-spacing: 3px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    margin-bottom: 2rem;
   }
 
   h1 {
-    font-size: 3rem;
+    font-size: 4rem;
+    font-weight: 800;
     margin-bottom: 0.5rem;
+    letter-spacing: -2px;
     background: linear-gradient(to right, #4ecdc4, #556270);
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
+  }
+
+  .result-text {
+    font-size: 1.5rem;
+    color: #4ecdc4;
+    letter-spacing: 2px;
+    margin-bottom: 2rem;
   }
 
   .player-grid {
@@ -609,102 +633,130 @@
     flex-wrap: wrap;
     justify-content: center;
     gap: 1rem;
-    margin: 2rem 0;
+    margin: 2rem 0 3rem 0;
   }
 
   .player-bubble {
-    background: rgba(78, 205, 196, 0.2);
-    border: 1px solid #4ecdc4;
-    color: #4ecdc4;
-    padding: 0.5rem 1rem;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: white;
+    padding: 0.6rem 1.2rem;
     border-radius: 20px;
     font-weight: bold;
-    font-size: 1.2rem;
+    font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    backdrop-filter: blur(5px);
+  }
+
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    background: #4ecdc4;
+    border-radius: 50%;
+    box-shadow: 0 0 10px #4ecdc4;
   }
 
   .start-btn {
     background: #4ecdc4;
     color: #0f172a;
     border: none;
-    padding: 1rem 3rem;
+    padding: 1.2rem 4rem;
     font-size: 1.5rem;
-    font-weight: 800;
-    border-radius: 50px;
+    font-weight: 900;
+    border-radius: 60px;
     cursor: pointer;
     text-transform: uppercase;
-    letter-spacing: 2px;
-    transition: all 0.2s;
-    box-shadow: 0 0 20px rgba(78, 205, 196, 0.4);
+    letter-spacing: 3px;
+    transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    box-shadow: 0 0 30px rgba(78, 205, 196, 0.3);
   }
 
-  .start-btn:hover {
+  .start-btn:hover:not(:disabled) {
     transform: scale(1.05);
-    box-shadow: 0 0 30px rgba(78, 205, 196, 0.6);
+    box-shadow: 0 0 50px rgba(78, 205, 196, 0.6);
   }
 
   .start-btn:disabled {
-    opacity: 0.5;
+    opacity: 0.2;
     cursor: not-allowed;
-    transform: none;
   }
 
   .hud {
     position: absolute;
-    top: 80px;
+    top: 20px;
     left: 0;
     width: 100%;
     display: flex;
     justify-content: space-between;
-    padding: 0 40px;
+    padding: 0 20px;
     pointer-events: none;
+    box-sizing: border-box;
   }
 
-  .panel {
-    text-align: center;
+  .panel.glass {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    padding: 1rem 2rem;
+    border-radius: 20px;
+    min-width: 150px;
   }
 
   .label {
-    font-size: 0.9rem;
-    color: rgba(255, 255, 255, 0.6);
-    letter-spacing: 1px;
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.4);
+    letter-spacing: 2px;
+    font-weight: 700;
   }
 
   .value {
-    font-size: 2.5rem;
-    font-weight: 800;
+    font-size: 2rem;
+    font-weight: 900;
+    line-height: 1;
   }
 
   .value.danger {
-    color: #ef4444;
-    text-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
+    color: #fe6b6b;
   }
   .value.success {
     color: #4ecdc4;
-    text-shadow: 0 0 10px rgba(78, 205, 196, 0.5);
   }
 
   .leaderboard {
     margin: 2rem 0;
     text-align: left;
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 16px;
+    padding: 10px;
   }
 
   .rank-row {
     display: flex;
     justify-content: space-between;
-    padding: 1rem;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
     font-size: 1.2rem;
   }
 
+  .rank-row:last-child {
+    border-bottom: none;
+  }
+
   .rank {
-    font-weight: bold;
-    color: #fbbf24;
+    font-weight: 900;
+    color: #4ecdc4;
     width: 40px;
   }
+
   .name {
     flex-grow: 1;
+    font-weight: 500;
   }
+
   .score {
-    font-weight: bold;
+    font-weight: 800;
+    color: #4ecdc4;
   }
 </style>
