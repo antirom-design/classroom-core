@@ -257,6 +257,8 @@
 
   function update() {
     const now = Date.now();
+    let nearest = null;
+    let minDist = Infinity;
 
     // Spawning logic
     if (gameState === "PLAYING" && now - lastSpawnTime > SPAWN_RATE) {
@@ -366,8 +368,18 @@
   }
 
   function draw() {
-    ctx.fillStyle = COLORS.background;
+    ctx.fillStyle = "#1e293b"; // Lighter slate for debug visibility
     ctx.fillRect(0, 0, width, height);
+
+    if (Math.random() < 0.01) {
+      console.log("DEBUG SHIP:", {
+        x: spaceship.x,
+        y: spaceship.y,
+        angle: spaceship.angle,
+        w: width,
+        h: height,
+      });
+    }
 
     // Draw Pulses (Signals)
     ctx.lineWidth = 2;
