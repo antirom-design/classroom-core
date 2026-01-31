@@ -62,6 +62,14 @@
     function handleLeave() {
         window.location.reload();
     }
+
+    function handlePulse() {
+        const btn = document.querySelector(".pulse-btn");
+        btn.classList.add("pushed");
+        setTimeout(() => btn.classList.remove("pushed"), 200);
+
+        websocket.sendPulse(sessionStorage.getItem("quiz_session_id"));
+    }
 </script>
 
 <div class="student-container">
@@ -119,6 +127,8 @@
             <p>Wait for next round...</p>
         </div>
     {/if}
+
+    <button class="pulse-btn" on:click={handlePulse}> 📡 SIGNAL </button>
 </div>
 
 <style>
@@ -214,6 +224,36 @@
         color: #ff6b6b;
         font-size: 4rem;
         margin: 0;
+    }
+
+    .pulse-btn {
+        position: fixed;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        color: rgba(255, 255, 255, 0.7);
+        padding: 12px 24px;
+        border-radius: 30px;
+        font-size: 0.9rem;
+        font-weight: 600;
+        cursor: pointer;
+        backdrop-filter: blur(5px);
+        transition: all 0.2s;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+
+    .pulse-btn:hover {
+        background: rgba(255, 255, 255, 0.2);
+        color: white;
+    }
+
+    .pulse-btn.pushed {
+        transform: translateX(-50%) scale(0.95);
+        background: #4ecdc4;
+        color: #1a1a1a;
     }
 
     @keyframes pulse {

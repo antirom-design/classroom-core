@@ -22,6 +22,7 @@
   let enemies = [];
   let projectiles = [];
   let particles = [];
+  let pulses = []; // New pulses array
 
   // Configuration
   const ENEMY_SPAWN_RATE = 2000; // ms
@@ -71,6 +72,25 @@
     if (msg.type === "towerShot") {
       fireTower(msg.data);
     }
+    if (msg.type === "pulse") {
+      handlePulse(msg.data);
+    }
+  }
+
+  function handlePulse(data) {
+    // Create a pulse visual
+    pulses.push({
+      x: Math.random() * width,
+      y: Math.random() * height,
+      radius: 0,
+      maxRadius: 200,
+      opacity: 1,
+      color: "#ffffff",
+      label: data.fromName,
+    });
+
+    // Also shake the tower a bit
+    tower.radius = 50;
   }
 
   function startGame() {
@@ -176,7 +196,10 @@
     const now = Date.now();
 
     if (now - lastSpawnTime > ENEMY_SPAWN_RATE / Math.sqrt(wave)) {
-      spawnEnemy();
+      // Only spawn if playing
+      if (gameState === "PLAYING") {
+        spawnEnemy();
+      }
       lastSpawnTime = now;
     }
 
@@ -243,6 +266,14 @@
       p.life -= 0.05;
       if (p.life <= 0) particles.splice(i, 1);
     }
+
+    // Update Pulses
+    for (let i = pulses.length - 1; i >= 0; i--) {
+      const p = pulses[i];
+      p.radius += 5;
+      p.opacity -= 0.02;
+      if (p.opacity <= 0) pulses.splice(i, 1);
+    }
   }
 
   function createParticles(x, y, color, count) {
@@ -262,8 +293,26 @@
   }
 
   function draw() {
+    // Clear
     ctx.fillStyle = COLORS.background;
     ctx.fillRect(0, 0, width, height);
+
+    // Draw Pulses
+    for (const p of pulses) {
+      ctx.globalAlpha = p.opacity;
+      ctx.strokeStyle = p.color;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Draw Text
+      ctx.fillStyle = p.color;
+      ctx.font = "14px Inter";
+      ctx.textAlign = "center";
+      ctx.fillText(p.label, p.x, p.y);
+    }
+    ctx.globalAlpha = 1.0;
 
     // Draw Particles
     for (const p of particles) {
@@ -319,7 +368,7 @@
   }
 
   function loop() {
-    if (gameState !== "PLAYING") return;
+    // Loop always needs to run for pulses even in Lobby
     update();
     draw();
     animationFrame = requestAnimationFrame(loop);
@@ -355,7 +404,7 @@
     </div>
   {/if}
 
-  <canvas bind:this={canvas} class:hidden={gameState === "LOBBY"}></canvas>
+  <canvas bind:this={canvas} class:active={true}></canvas>
 
   {#if gameState === "PLAYING"}
     <div class="hud">
@@ -381,10 +430,6 @@
     height: 100%;
   }
 
-  canvas.hidden {
-    display: none;
-  }
-
   .lobby {
     position: absolute;
     top: 50%;
@@ -392,6 +437,7 @@
     transform: translate(-50%, -50%);
     text-align: center;
     width: 80%;
+    z-index: 10;
   }
 
   .player-grid {

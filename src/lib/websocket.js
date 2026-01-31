@@ -79,6 +79,11 @@ export function createWebSocket() {
       send('submitQuizAnswer', { sessionId, questionId, answerIndex });
     },
 
+    // Interaction Pulse
+    sendPulse: (sessionId) => {
+      send('pulse', { sessionId });
+    },
+
     // Mock functions for compatibility or future use
     sendSettings: (settings) => { },
     sendUserColorChange: (color) => { }

@@ -29,7 +29,21 @@
 
     // Check local storage for name
     const savedName = localStorage.getItem("quiz_last_name");
-    if (savedName) {
+
+    // Check for join code in URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const joinCode = urlParams.get("join");
+
+    if (joinCode) {
+      roomCode.set(joinCode);
+      if (savedName) {
+        user.set({ displayName: savedName });
+        connect(joinCode);
+      } else {
+        // Wait for name input
+        appState.set("NAMED");
+      }
+    } else if (savedName) {
       user.set({ displayName: savedName });
     }
   });
