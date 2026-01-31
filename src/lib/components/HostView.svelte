@@ -288,15 +288,31 @@
       // Hit Ship?
       const dist = Math.sqrt(
         (a.x - spaceship.x) ** 2 + (a.y - spaceship.y) ** 2,
-      );
-      if (dist < spaceship.radius + 30) {
-        // STRIKE!
-        strikes++;
-        asteroids.splice(i, 1);
-        createParticles(spaceship.x, spaceship.y, "#ef4444", 20); // Red explosion
-        // Shake effect could go here
+      if (distToShip < spaceship.radius + 30) {
+          // STRIKE!
+          strikes++;
+          asteroids.splice(i, 1);
+          createParticles(spaceship.x, spaceship.y, "#ef4444", 20); // Red explosion
       }
     }
+
+    // Rotate Ship to face nearest
+    if (nearest) {
+        const targetAngle = Math.atan2(nearest.y - spaceship.y, nearest.x - spaceship.x);
+        // Smooth rotation
+        let diff = targetAngle - spaceship.angle;
+        // Normalize
+        while (diff > Math.PI) diff -= Math.PI * 2;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+        spaceship.angle += diff * 0.1;
+    } else {
+        // Spin slowly if idle
+        spaceship.angle += 0.01;
+    }
+
+    // Ship Drift (return to center)
+    spaceship.x += (width/2 - spaceship.x) * 0.05;
+    spaceship.y += (height/2 - spaceship.y) * 0.05;
 
     // Lasers
     for (const l of lasers) {
@@ -352,9 +368,6 @@
       ctx.stroke();
       ctx.fillStyle = p.color;
       ctx.font = "14px Inter";
-      ctx.textAlign = "center";
-      ctx.fillText(p.label, p.x, p.y);
-    }
     ctx.globalAlpha = 1.0;
 
     // Draw Particles

@@ -136,12 +136,15 @@
 <style>
     .student-container {
         height: 100%;
+        width: 100%;
+        box-sizing: border-box;
         padding: 1rem;
         display: flex;
         flex-direction: column;
         background: #2b2b2b;
         color: white;
         font-family: "Inter", sans-serif;
+        overflow-y: auto; /* Allow scrolling if content is too tall */
     }
 
     .top-bar {

@@ -171,7 +171,7 @@
 <style>
   main {
     width: 100vw;
-    height: 100vh;
+    height: 100dvh; /* Dynamic viewport height for mobile */
     overflow: hidden;
     background: #1a1a1a;
     color: white;
