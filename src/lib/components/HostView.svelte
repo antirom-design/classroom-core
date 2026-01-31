@@ -27,6 +27,7 @@
   let lasers = [];
   let particles = [];
   let pulses = [];
+  let scoringNotifs = []; // { x, y, text, life, opacity }
   let spawnQueue = 0;
 
   // Configuration
@@ -183,6 +184,15 @@
       angle = Math.atan2(target.y - spaceship.y, target.x - spaceship.x);
       tx = target.x;
       ty = target.y;
+
+      // Scoring Notification
+      scoringNotifs.push({
+        x: spaceship.x + 40,
+        y: spaceship.y - 40,
+        text: `${data.fromName} +${data.damage}`,
+        life: 1.0,
+        opacity: 1.0,
+      });
 
       // Instant Hit Visual
       lasers.push({
@@ -349,6 +359,15 @@
       p.opacity -= 0.02;
       if (p.opacity <= 0) pulses.splice(i, 1);
     }
+
+    // Scoring Notifications
+    for (let i = scoringNotifs.length - 1; i >= 0; i--) {
+      const s = scoringNotifs[i];
+      s.y -= 1; // Float up
+      s.life -= 0.02;
+      s.opacity = s.life;
+      if (s.life <= 0) scoringNotifs.splice(i, 1);
+    }
   }
 
   function createParticles(x, y, color, count) {
@@ -447,6 +466,16 @@
     ctx.lineTo(-15, -15); // Bottom Left
     ctx.closePath();
     ctx.fill();
+
+    // Draw Scoring Notifications
+    ctx.textAlign = "left";
+    ctx.font = "bold 18px Inter";
+    for (const s of scoringNotifs) {
+      ctx.globalAlpha = s.opacity;
+      ctx.fillStyle = COLORS.accent;
+      ctx.fillText(s.text, s.x, s.y);
+    }
+    ctx.globalAlpha = 1.0;
 
     // Shield / Strike Indicator
     if (strikes > 0) {

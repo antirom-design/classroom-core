@@ -17,7 +17,6 @@
     $: currentQuestion = questions[currentQuestionIndex];
 
     // Feedback
-    let lastResult = null; // { correct: bool, points: int }
 
     websocket.subscribe((msg) => {
         if (msg.type === "quizMissionStarted") {
@@ -27,27 +26,16 @@
             currentQuestionIndex = 0;
         }
         if (msg.type === "quizResult") {
-            console.log("[StudentView] 📊 Result received", msg.data);
-            const {
-                correct,
-                streak: newStreak,
-                pointsAdded,
-                totalScore: newTotal,
-            } = msg.data;
+            const { streak: newStreak, totalScore: newTotal } = msg.data;
             streak = newStreak;
             totalScore = newTotal;
-            gameState = "RESULT";
-            lastResult = { correct, points: pointsAdded };
 
-            // Auto advance after short delay
-            setTimeout(() => {
-                if (currentQuestionIndex < questions.length - 1) {
-                    currentQuestionIndex++;
-                    gameState = "QUIZ";
-                } else {
-                    gameState = "FINISHED";
-                }
-            }, 1500);
+            if (currentQuestionIndex < questions.length - 1) {
+                currentQuestionIndex++;
+                gameState = "QUIZ";
+            } else {
+                gameState = "FINISHED";
+            }
         }
     });
 
@@ -110,17 +98,6 @@
             <div class="progress">
                 Question {currentQuestionIndex + 1} / {questions.length}
             </div>
-        </div>
-    {:else if gameState === "RESULT"}
-        <div class="result-feedback" in:scale>
-            {#if lastResult.correct}
-                <h1 class="correct">✅ +{lastResult.points}</h1>
-                {#if streak >= 3}
-                    <p class="combo">COMBO x{Math.floor(streak / 3) + 1}!</p>
-                {/if}
-            {:else}
-                <h1 class="wrong">❌</h1>
-            {/if}
         </div>
     {:else if gameState === "FINISHED"}
         <div class="finished" in:fade>
@@ -210,25 +187,6 @@
 
     .option-btn:active {
         transform: scale(0.98);
-    }
-
-    .result-feedback {
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        text-align: center;
-    }
-
-    .correct {
-        color: #4ecdc4;
-        font-size: 4rem;
-        margin: 0;
-    }
-    .wrong {
-        color: #ff6b6b;
-        font-size: 4rem;
-        margin: 0;
     }
 
     .pulse-btn {
